@@ -81,11 +81,20 @@
     
     ASDataControllerLogEvent(self, @"triggeredUpdate: %@", _changeSet);
     
+    // Prepare UIKit batch updates
     [super beginUpdates];
     
     for (_ASHierarchyItemChange *change in [_changeSet itemChangesOfType:_ASHierarchyChangeTypeDelete]) {
       [super deleteRowsAtIndexPaths:change.indexPaths withAnimationOptions:change.animationOptions];
     }
+    
+    // TODO: Move (Delete)
+    NSArray * fromIP = @[
+     [NSIndexPath indexPathForRow:2 inSection:0],
+     [NSIndexPath indexPathForRow:1 inSection:0],
+//     [NSIndexPath indexPathForRow:0 inSection:0]
+     ];
+//    [super deleteRowsAtIndexPaths:fromIP withAnimationOptions:5];
     
     for (_ASHierarchySectionChange *change in [_changeSet sectionChangesOfType:_ASHierarchyChangeTypeDelete]) {
       [super deleteSections:change.indexSet withAnimationOptions:change.animationOptions];
@@ -99,10 +108,33 @@
       [super insertRowsAtIndexPaths:change.indexPaths withAnimationOptions:change.animationOptions];
     }
     
-    for (_ASHierarchyItemChange *change in [_changeSet itemChangesOfType:_ASHierarchyChangeTypeMove]) {
+    // TODO: Move (Insert)
+    NSArray * toIP = @[
+     [NSIndexPath indexPathForRow:8 inSection:0],
+     [NSIndexPath indexPathForRow:9 inSection:0]
+     ];
+//    [super insertRowsAtIndexPaths:toIP withAnimationOptions:5];
+//    NSArray *nodes = [];
+//    [super insertRowsWithNodes:nodes atIndexPaths:toIP];
+    
+    // TODO
+    NSMutableArray *fromIndexPaths = [[NSMutableArray alloc] initWithCapacity:2];
+    NSMutableArray *toIndexPaths = [[NSMutableArray alloc] initWithCapacity:2];
+    NSArray *items = [_changeSet itemChangesOfType:_ASHierarchyChangeTypeMove];
+    
+    ASDataControllerAnimationOptions animatonOptions = ((_ASHierarchyItemChange *)[items firstObject]).animationOptions;
+    
+    for (_ASHierarchyItemChange *change in items) {
+      
+      [fromIndexPaths addObject:change.fromIndexPath];
+      [toIndexPaths addObject:change.toIndexPath];
       [super moveRowAtIndexPath:change.fromIndexPath toIndexPath:change.toIndexPath withAnimationOptions:change.animationOptions];
     }
-
+    
+    // Split Move into Delete (descending) + Insert (ascending)
+    
+//    [super moveRowsFromIndexPaths:fromIndexPaths toIndexPaths:toIndexPaths withAnimationOptions:animatonOptions];
+    
 #if ASEVENTLOG_ENABLE
     NSString *changeSetDescription = ASObjectDescriptionMakeTiny(_changeSet);
     batchCompletion = ^(BOOL finished) {
@@ -205,6 +237,8 @@
   ASDisplayNodeAssertMainThread();
   [self beginUpdates];
   [_changeSet moveItemFromIndexPath:indexPath toIndexPath:newIndexPath animationOptions:animationOptions];
+  [_changeSet deleteItems:@[indexPath] animationOptions:animationOptions];
+  [_changeSet insertItems:@[newIndexPath] animationOptions:animationOptions];
   [self endUpdates];
 }
 

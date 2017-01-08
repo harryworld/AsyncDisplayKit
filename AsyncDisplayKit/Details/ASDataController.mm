@@ -23,8 +23,8 @@
 #import "ASInternalHelpers.h"
 #import "ASCellNode+Internal.h"
 
-//#define LOG(...) NSLog(__VA_ARGS__)
-#define LOG(...)
+#define LOG(...) NSLog(__VA_ARGS__)
+//#define LOG(...)
 
 #define AS_MEASURE_AVOIDED_DATACONTROLLER_WORK 0
 
@@ -65,6 +65,10 @@ NSString * const ASCollectionInvalidUpdateException = @"ASCollectionInvalidUpdat
   BOOL _delegateDidMoveNode;
   BOOL _delegateDidInsertSections;
   BOOL _delegateDidDeleteSections;
+  
+  NSMutableDictionary *_moveIndexPathPairs;
+  NSMutableDictionary *_moveFromDict;
+  NSMutableDictionary *_moveToDict;
 }
 
 @end
@@ -261,6 +265,7 @@ NSString * const ASCollectionInvalidUpdateException = @"ASCollectionInvalidUpdat
   [_mainSerialQueue performBlockOnMainThread:^{
     _completedNodes[kind] = completedNodes;
     if (completionBlock) {
+      NSArray *ips = @[[NSIndexPath indexPathForRow:0 inSection:0]];
       completionBlock(nodes, indexPaths);
     }
   }];
@@ -303,6 +308,154 @@ NSString * const ASCollectionInvalidUpdateException = @"ASCollectionInvalidUpdat
     if (completionBlock) {
       completionBlock(fromIndexPath, toIndexPath);
     }
+  }];
+    
+//    [self deleteNodesOfKind:ASDataControllerRowNodeKind atIndexPaths:@[fromIndexPath] completion:nil];
+//    [self insertNodes:<#(NSArray *)#> ofKind:<#(NSString *)#> atIndexPaths:<#(NSArray *)#> completion:<#^(NSArray<ASCellNode *> *nodes, NSArray<NSIndexPath *> *indexPaths)completionBlock#>]
+}
+
+// 1
+- (void)moveRowsFromIndexPaths:(NSArray *)fromIndexPaths toIndexPaths:(NSArray *)toIndexPaths withAnimationOptions:(ASDataControllerAnimationOptions)animationOptions
+{
+  ASDisplayNodeAssertMainThread();
+  
+  if (!_initialReloadDataHasBeenCalled) {
+    return;
+  }
+  
+  LOG(@"Edit Command - deleteRows: %@", fromIndexPaths);
+  
+  dispatch_group_wait(_editingTransactionGroup, DISPATCH_TIME_FOREVER);
+  
+  // Sort indexPath in order to avoid messing up the index when deleting in several batches.
+  // FIXME: Shouldn't deletes be sorted in descending order?
+//  NSArray *descFromIndexPaths = [fromIndexPaths sortedArrayUsingSelector:@selector(asdk_inverseCompare:)];
+//  NSArray *ascToIndexPaths = [toIndexPaths sortedArrayUsingSelector:@selector(compare:)];
+  
+//  ASDeleteElementsInMultidimensionalArrayAtIndexPaths(_nodeContexts[ASDataControllerRowNodeKind], sortedIndexPaths);
+//  [self prepareForDeleteRowsAtIndexPaths:sortedIndexPaths];
+  
+  dispatch_group_async(_editingTransactionGroup, _editingTransactionQueue, ^{
+//    [self willDeleteRowsAtIndexPaths:sortedFromIndexPaths];
+    
+    LOG(@"Edit Transaction - deleteRows: %@", fromIndexPaths);
+    [self _moveNodesFromIndexPaths:fromIndexPaths toIndexPaths:toIndexPaths withAnimationOptions:animationOptions];
+  });
+}
+
+// 2
+- (void)_moveNodesFromIndexPaths:(NSArray *)fromIndexPaths toIndexPaths:(NSArray *)toIndexPaths withAnimationOptions:(ASDataControllerAnimationOptions)animationOptions
+{
+  ASSERT_ON_EDITING_QUEUE;
+  
+//  [self moveNodesOfKind:ASDataControllerRowNodeKind fromIndexPaths:fromIndexPaths toIndexPaths:toIndexPaths];
+  
+  if (!fromIndexPaths.count || !toIndexPaths.count || _dataSource == nil) {
+    return;
+  }
+  
+  _moveIndexPathPairs = [[NSMutableDictionary alloc] initWithCapacity:fromIndexPaths.count];
+  _moveFromDict = [[NSMutableDictionary alloc] initWithCapacity:fromIndexPaths.count];
+  _moveToDict = [[NSMutableDictionary alloc] initWithCapacity:toIndexPaths.count];
+  
+  [self gatherMoveNodes:ASDataControllerRowNodeKind fromIndexPaths:fromIndexPaths toIndexPaths:toIndexPaths];
+//  [self deleteMoveFroms:ASDataControllerRowNodeKind fromIndexPaths:fromIndexPaths toIndexPaths:toIndexPaths];
+//  [self insertMoveTos:ASDataControllerRowNodeKind toIndexPaths:toIndexPaths];
+}
+
+- (void)gatherMoveNodes:(NSString *)kind fromIndexPaths:(NSArray *)fromIndexPaths toIndexPaths:(NSArray *)toIndexPaths
+{
+  // Move Pair linking fromIndexPath -> toIndexPath
+  for (int i = 0; i < fromIndexPaths.count; i++) {
+    [_moveIndexPathPairs setObject:toIndexPaths[i] forKey:fromIndexPaths[i]];
+  }
+  
+  for (int i = 0; i < fromIndexPaths.count; i++) {
+    NSArray *nodes = ASFindElementsInMultidimensionalArrayAtIndexPaths(_completedNodes[kind], @[fromIndexPaths[i]]);
+    id node = [nodes firstObject];
+    
+    [_moveFromDict setObject:node forKey:fromIndexPaths[i]];
+    NSIndexPath *toIndexPath = [_moveIndexPathPairs objectForKey:fromIndexPaths[i]];
+    [_moveToDict setObject:node forKey:toIndexPath];
+  }
+}
+
+- (void)deleteMoveFroms:(NSString *)kind fromIndexPaths:(NSArray *)fromIndexPaths toIndexPaths:(NSArray *)toIndexPaths
+{
+  ASDeleteElementsInMultidimensionalArrayAtIndexPaths(_editingNodes[kind], fromIndexPaths);
+  NSMutableArray *allNodes = _completedNodes[kind];
+  NSArray *nodes = ASFindElementsInMultidimensionalArrayAtIndexPaths(allNodes, fromIndexPaths); // B, A
+  ASDeleteElementsInMultidimensionalArrayAtIndexPaths(allNodes, fromIndexPaths);
+  
+}
+
+- (void)insertMoveTos:(NSString *)kind toIndexPaths:(NSArray *)toIndexPaths
+{
+  NSArray *ascToIndexPaths = [toIndexPaths sortedArrayUsingSelector:@selector(compare:)];
+  
+  NSMutableArray *insertItems = [[NSMutableArray alloc] initWithCapacity:toIndexPaths.count];
+  for (NSIndexPath *indexPath in ascToIndexPaths) {
+    id node = [_moveToDict objectForKey:indexPath];
+    [insertItems addObject: node];
+  }
+  
+  NSMutableArray *editingNodes = _editingNodes[kind];
+  ASInsertElementsIntoMultidimensionalArrayAtIndexPaths(editingNodes, ascToIndexPaths, insertItems);
+  NSMutableArray *completedNodes = ASTwoDimensionalArrayDeepMutableCopy(editingNodes);
+  
+  [_mainSerialQueue performBlockOnMainThread:^{
+    _completedNodes[kind] = completedNodes;
+  }];
+}
+
+// 3
+- (void)moveNodesOfKind:(NSString *)kind fromIndexPaths:(NSArray *)fromIndexPaths toIndexPaths:(NSArray *)toIndexPaths
+{
+  ASSERT_ON_EDITING_QUEUE;
+  if (!fromIndexPaths.count || !toIndexPaths.count || _dataSource == nil) {
+    return;
+  }
+  // [A, B, C]
+  NSMutableDictionary *movePair = [[NSMutableDictionary alloc] initWithCapacity:fromIndexPaths.count];
+  for (int i = 0; i < fromIndexPaths.count; i++) {
+    [movePair setObject:toIndexPaths[i] forKey:fromIndexPaths[i]];
+  }
+  
+  NSArray *descFromIndexPaths = [fromIndexPaths sortedArrayUsingSelector:@selector(asdk_inverseCompare:)];
+  NSArray *ascToIndexPaths = [toIndexPaths sortedArrayUsingSelector:@selector(compare:)];
+  
+  // Gather moved items
+  NSMutableDictionary *fromDict = [[NSMutableDictionary alloc] initWithCapacity:fromIndexPaths.count];
+//  NSMutableArray *descFromItems = [[NSMutableArray alloc] initWithCapacity:fromIndexPaths.count];
+  NSMutableDictionary *toDict = [[NSMutableDictionary alloc] initWithCapacity:ascToIndexPaths.count];
+  for (int i = 0; i < descFromIndexPaths.count; i++) {
+    NSArray *nodes = ASFindElementsInMultidimensionalArrayAtIndexPaths(_completedNodes[kind], @[descFromIndexPaths[i]]);
+    id node = [nodes firstObject];
+    [fromDict setObject:node forKey:descFromIndexPaths[i]];
+//    [descFromItems addObject:node];
+    NSIndexPath *toIndexPath = [movePair objectForKey:descFromIndexPaths[i]];
+    [toDict setObject:node forKey:toIndexPath];
+  }
+  
+  // Delete move-froms in descending order
+  ASDeleteElementsInMultidimensionalArrayAtIndexPaths(_editingNodes[kind], descFromIndexPaths);
+  NSMutableArray *allNodes = _completedNodes[kind];
+  NSArray *nodes = ASFindElementsInMultidimensionalArrayAtIndexPaths(allNodes, descFromIndexPaths); // B, A
+  ASDeleteElementsInMultidimensionalArrayAtIndexPaths(allNodes, descFromIndexPaths);
+  
+  NSMutableArray *insertItems = [[NSMutableArray alloc] initWithCapacity:ascToIndexPaths.count];
+  for (NSIndexPath *indexPath in ascToIndexPaths) {
+    id node = [toDict objectForKey:indexPath];
+    [insertItems addObject: node];
+  }
+  
+  // Insert move-tos in ascending order
+  NSMutableArray *editingNodes = _editingNodes[kind];
+  ASInsertElementsIntoMultidimensionalArrayAtIndexPaths(editingNodes, ascToIndexPaths, insertItems);
+  NSMutableArray *completedNodes = ASTwoDimensionalArrayDeepMutableCopy(editingNodes);
+  
+  [_mainSerialQueue performBlockOnMainThread:^{
+    _completedNodes[kind] = completedNodes;
   }];
 }
 
@@ -361,11 +514,22 @@ NSString * const ASCollectionInvalidUpdateException = @"ASCollectionInvalidUpdat
   [self insertNodes:nodes ofKind:ASDataControllerRowNodeKind atIndexPaths:indexPaths completion:^(NSArray *nodes, NSArray *indexPaths) {
     ASDisplayNodeAssertMainThread();
     
+    // TODO
+    NSMutableArray *newNodes = [[NSMutableArray alloc] initWithCapacity:nodes.count];
+    NSMutableArray *newIndexPaths = [[NSMutableArray alloc] initWithCapacity:indexPaths.count];
+    
+    for (int i = 0; i < indexPaths.count; i++) {
+      if (![[_moveToDict allKeys] containsObject:indexPaths[i]]) {
+        [newNodes addObject:nodes[i]];
+        [newIndexPaths addObject:indexPaths[i]];
+      }
+    }
+    
     if (_delegateDidInsertNodes)
-      [_delegate dataController:self didInsertNodes:nodes atIndexPaths:indexPaths withAnimationOptions:animationOptions];
+      [_delegate dataController:self didInsertNodes:newNodes atIndexPaths:newIndexPaths withAnimationOptions:animationOptions];
   }];
 }
-
+// 2
 /**
  * Removes the specified nodes at the given index paths and notifies the delegate of the nodes removed.
  *
@@ -392,12 +556,14 @@ NSString * const ASCollectionInvalidUpdateException = @"ASCollectionInvalidUpdat
 {
   ASSERT_ON_EDITING_QUEUE;
   
-  [self moveNodeOfKind:ASDataControllerRowNodeKind fromIndexPath:fromIndexPath toIndexPath:toIndexPath completion:^(NSIndexPath *fromIndexPath, NSIndexPath *toIndexPath) {
+//  [self moveNodeOfKind:ASDataControllerRowNodeKind fromIndexPath:fromIndexPath toIndexPath:toIndexPath completion:^(NSIndexPath *fromIndexPath, NSIndexPath *toIndexPath) {
+  [_mainSerialQueue performBlockOnMainThread:^{
     ASDisplayNodeAssertMainThread();
     
     if (_delegateDidMoveNode)
       [_delegate dataController:self didMoveFromIndexPath:fromIndexPath toIndexPath:toIndexPath withinAnimationOptions:animationOptions];
   }];
+//  }];
 }
 
 /**
@@ -773,6 +939,11 @@ NSString * const ASCollectionInvalidUpdateException = @"ASCollectionInvalidUpdat
 
 #pragma mark - Row Editing (External API)
 
+- (void)insertRowsWithNodes:(NSArray *)nodes atIndexPaths:(NSArray *)indexPaths
+{
+  
+}
+
 - (void)insertRowsAtIndexPaths:(NSArray *)indexPaths withAnimationOptions:(ASDataControllerAnimationOptions)animationOptions
 {
   ASDisplayNodeAssertMainThread();
@@ -809,7 +980,7 @@ NSString * const ASCollectionInvalidUpdateException = @"ASCollectionInvalidUpdat
     [self _batchLayoutAndInsertNodesFromContexts:contexts withAnimationOptions:animationOptions];
   });
 }
-
+// 1
 - (void)deleteRowsAtIndexPaths:(NSArray *)indexPaths withAnimationOptions:(ASDataControllerAnimationOptions)animationOptions
 {
   ASDisplayNodeAssertMainThread();
