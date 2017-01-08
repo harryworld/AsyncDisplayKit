@@ -174,16 +174,12 @@ extern NSString * const ASCollectionInvalidUpdateException;
 
 - (void)moveSection:(NSInteger)section toSection:(NSInteger)newSection withAnimationOptions:(ASDataControllerAnimationOptions)animationOptions;
 
-// TODO
-- (void)insertRowsWithNodes:(NSArray *)nodes atIndexPaths:(NSArray *)indexPaths;
-
 - (void)insertRowsAtIndexPaths:(NSArray<NSIndexPath *> *)indexPaths withAnimationOptions:(ASDataControllerAnimationOptions)animationOptions;
 
 - (void)deleteRowsAtIndexPaths:(NSArray<NSIndexPath *> *)indexPaths withAnimationOptions:(ASDataControllerAnimationOptions)animationOptions;
 
 - (void)reloadRowsAtIndexPaths:(NSArray<NSIndexPath *> *)indexPaths withAnimationOptions:(ASDataControllerAnimationOptions)animationOptions;
 
-- (void)moveRowsFromIndexPaths:(NSArray *)fromIndexPaths toIndexPaths:(NSArray *)toIndexPaths withAnimationOptions:(ASDataControllerAnimationOptions)animationOptions;
 - (void)prepareMoveItemChanges:(NSArray *)items;
 
 /**

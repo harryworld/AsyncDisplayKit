@@ -1592,8 +1592,7 @@ static NSString * const kCellReuseIdentifier = @"_ASCollectionViewCell";
   [_layoutFacilitator collectionViewWillEditCellsAtIndexPaths:indexPaths batched:_performingBatchUpdates];
   if (_performingBatchUpdates) {
     [_batchUpdateBlocks addObject:^{
-      [super insertItemsAtIndexPaths:@[[NSIndexPath indexPathForRow:0 inSection:0]]];
-//      [super insertItemsAtIndexPaths:indexPaths];
+      [super insertItemsAtIndexPaths:indexPaths];
     }];
   } else {
     [UIView performWithoutAnimation:^{
@@ -1615,7 +1614,7 @@ static NSString * const kCellReuseIdentifier = @"_ASCollectionViewCell";
   [_layoutFacilitator collectionViewWillEditCellsAtIndexPaths:indexPaths batched:_performingBatchUpdates];
   if (_performingBatchUpdates) {
     [_batchUpdateBlocks addObject:^{
-//      [super deleteItemsAtIndexPaths:indexPaths];
+      [super deleteItemsAtIndexPaths:indexPaths];
     }];
   } else {
     [UIView performWithoutAnimation:^{
