@@ -189,7 +189,7 @@ static NSCharacterSet *_defaultAvoidTruncationCharacterSet()
 
 #pragma mark - Drawing
 
-- (void)drawInContext:(CGContextRef)context bounds:(CGRect)bounds completion:(ASTextNodeDrawCompletionBlock)completionBlock;
+- (void)drawInContext:(CGContextRef)context bounds:(CGRect)bounds completion:(ASTextNodeRenderCompletionBlock)completionBlock;
 {
   // We add an assertion so we can track the rare conditions where a graphics context is not present
   ASDisplayNodeAssertNotNil(context, @"This is no good without a context.");
@@ -212,6 +212,11 @@ static NSCharacterSet *_defaultAvoidTruncationCharacterSet()
       drawingBounds.size.height += 3;
     }
     [_attributes.attributedString drawWithRect:drawingBounds options:NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingTruncatesLastVisibleLine context:self.stringDrawingContext];
+    
+    // Notify text render has completed
+    if (completionBlock) {
+      completionBlock();
+    }
   } else {
     BOOL isScaled = [self isScaled];
     [[self context] performBlockWithLockedTextKitComponents:^(NSLayoutManager *layoutManager, NSTextStorage *textStorage, NSTextContainer *textContainer) {
@@ -245,7 +250,10 @@ static NSCharacterSet *_defaultAvoidTruncationCharacterSet()
         [textStorage addLayoutManager:layoutManager];
       }
       
-      completionBlock([self isTruncated]);
+      // Notify text render has completed
+      if (completionBlock) {
+        completionBlock();
+      }
     }];
   }
 
