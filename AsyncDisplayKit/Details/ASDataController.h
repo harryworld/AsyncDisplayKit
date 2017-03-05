@@ -92,6 +92,9 @@ extern NSString * const ASCollectionInvalidUpdateException;
  */
 - (void)dataController:(ASDataController *)dataController didDeleteNodes:(NSArray<ASCellNode *> *)nodes atIndexPaths:(NSArray<NSIndexPath *> *)indexPaths withAnimationOptions:(ASDataControllerAnimationOptions)animationOptions;
 
+// FIXME: Description
+- (void)dataController:(ASDataController *)dataController didMoveAtIndexPath:(NSIndexPath *)indexPath toIndexPath:(NSIndexPath *)toIndexPath withAnimationOptions:(ASDataControllerAnimationOptions)animationOptions;
+
 /**
  Called for insertion of sections.
  */

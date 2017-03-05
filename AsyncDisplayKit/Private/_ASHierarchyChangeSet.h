@@ -26,6 +26,9 @@ typedef NS_ENUM(NSInteger, _ASHierarchyChangeType) {
    */
   _ASHierarchyChangeTypeReload,
   
+  // FIXME: Description
+  _ASHierarchyChangeTypeMove,
+  
   /**
    * A change that was either an original delete, or the first 
    * part of a decomposed reload.
@@ -89,6 +92,14 @@ NSString *NSStringFromASHierarchyChangeType(_ASHierarchyChangeType changeType);
  * with type .Insert or .Delete. Calling this on changes of other types is an error.
  */
 - (_ASHierarchyItemChange *)changeByFinalizingType;
+@end
+
+/**
+  * Subclass to handle move
+  */
+@interface _ASHierarchyMoveItemChange : _ASHierarchyItemChange
+@property (nonatomic, strong, readonly) NSIndexPath *fromIndexPath;
+@property (nonatomic, strong, readonly) NSIndexPath *toIndexPath;
 @end
 
 @interface _ASHierarchyChangeSet : NSObject <ASDescriptionProvider, ASDebugDescriptionProvider>

@@ -188,6 +188,8 @@ AS_SUBCLASSING_RESTRICTED
  */
 - (void)rangeController:(ASRangeController *)rangeController didDeleteNodes:(NSArray<ASCellNode *> *)nodes atIndexPaths:(NSArray<NSIndexPath *> *)indexPaths withAnimationOptions:(ASDataControllerAnimationOptions)animationOptions;
 
+- (void)rangeController:(ASRangeController *)rangeController didMoveAtIndexPath:(NSIndexPath *)indexPath toIndexPath:(NSIndexPath *)newIndexPath withAnimationOptions:(ASDataControllerAnimationOptions)animationOptions;
+
 /**
  * Called for section insertion.
  *

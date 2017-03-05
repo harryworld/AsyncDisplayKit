@@ -515,6 +515,12 @@ static UIApplicationState __ApplicationState = UIApplicationStateActive;
   [_delegate rangeController:self didDeleteNodes:nodes atIndexPaths:indexPaths withAnimationOptions:animationOptions];
 }
 
+- (void)dataController:(ASDataController *)dataController didMoveAtIndexPath:(NSIndexPath *)indexPath toIndexPath:(NSIndexPath *)newIndexPath withAnimationOptions:(ASDataControllerAnimationOptions)animationOptions
+{
+    ASDisplayNodeAssertMainThread();
+    [_delegate rangeController:self didMoveAtIndexPath:indexPath toIndexPath:newIndexPath withAnimationOptions:animationOptions];
+}
+
 - (void)dataController:(ASDataController *)dataController didInsertSections:(NSArray *)sections atIndexSet:(NSIndexSet *)indexSet withAnimationOptions:(ASDataControllerAnimationOptions)animationOptions
 {
   ASDisplayNodeAssert(sections.count == indexSet.count, @"Invalid sections");
